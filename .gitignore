@@ -1,0 +1,6 @@
+cuda_image_processor
+*.o
+data/input/*.pgm
+output/*.pgm
+__pycache__/
+*.log
