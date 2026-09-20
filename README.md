@@ -1,42 +1,66 @@
 # CUDA Accelerated Batch Image Processing
 
-CUDA project for batch Sobel edge detection on grayscale PGM images.
+A CUDA project that performs Sobel edge detection on a batch of grayscale PGM images. CPU code handles file I/O and dataset management; a custom CUDA kernel performs pixel-level image processing in parallel.
+
+## Requirements
+- NVIDIA GPU with CUDA support
+- CUDA Toolkit / nvcc
+- C++17 compiler
+- Python 3
 
 ## Build
-
 ```bash
 make
 ```
 
-## Generate a dataset
-
-```bash
+## Generate a large test dataset
+```python
 python3 scripts/generate_dataset.py --count 200 --width 256 --height 256 --output data/input
 ```
 
 ## Run
-
 ```bash
 ./cuda_image_processor --input data/input --output output --threads 256
 ```
 
-CLI options: `--input`, `--output`, `--limit`, `--threads`.
+Or run the complete workflow:
+```bash
+./run.sh
+```
 
-The CPU handles PGM file I/O while a custom CUDA kernel processes pixels in parallel using the 3x3 Sobel operator. GPU kernel time is measured with CUDA events.
+## CLI arguments
+- `--input DIR` input directory containing PGM images
+- `--output DIR` output directory for edge images
+- `--limit N` optional maximum number of images
+- `--threads N` CUDA threads per block (1-1024)
 
-## Requirements
+## Algorithm
+Each image uses the standard 3x3 Sobel masks:
+- Gx detects horizontal intensity changes.
+- Gy detects vertical intensity changes.
+- Edge magnitude is `sqrt(Gx^2 + Gy^2)`, clamped to 0-255.
 
-NVIDIA GPU, CUDA toolkit/nvcc, C++17, and Python 3.
+The CUDA kernel uses a grid-stride loop over the complete batch, so many images and pixels are processed concurrently.
 
-## Project structure
+## CUDA design
+1. CPU reads all PGM images and packs their pixels into one contiguous host buffer.
+2. The buffer is copied to device memory.
+3. `SobelBatchKernel` computes the edge magnitude for each pixel.
+4. CUDA events measure kernel execution time.
+5. Results are copied back and written as PGM images.
 
-- `src/` CUDA implementation
-- `include/` header
-- `scripts/` deterministic dataset generator
-- `docs/` execution evidence and submission checklist
-- `Makefile` build support
-- `run.sh` end-to-end runner
+The project intentionally keeps file parsing on the CPU and the computationally intensive pixel operation on the GPU.
+
+## Evidence
+Run the project on the generated 200-image dataset and save the real terminal output. Record the GPU, CUDA version, dimensions, image count, total pixels, threads per block, and measured kernel time in `docs/execution-evidence-template.md`. Do not invent performance measurements.
 
 ## Lessons learned
+This project demonstrates CUDA memory allocation and transfers, custom kernel design, grid-stride execution, CUDA event timing, batch processing, and the separation of CPU I/O from GPU computation. A practical challenge is handling image boundaries correctly while keeping the kernel simple and parallel.
 
-The project demonstrates batch GPU processing, device memory management, grid-stride execution, CUDA event timing, and practical separation of CPU file I/O from GPU computation.
+## Structure
+- `src/image_processing.cu` CUDA kernel and host application
+- `include/image_processing.h` declarations
+- `scripts/generate_dataset.py` deterministic PGM dataset generator
+- `Makefile` build support
+- `run.sh` end-to-end runner
+- `docs/` evidence and submission checklist
